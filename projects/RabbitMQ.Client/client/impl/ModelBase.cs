@@ -29,14 +29,17 @@
 //  Copyright (c) 2007-2020 VMware, Inc.  All rights reserved.
 //---------------------------------------------------------------------------
 
+//1.0.1				20210308				shirhan.apache@gmail.com						Adding DiagnosticSource to .Net Client
 using System;
 using System.Buffers;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using RabbitMQ.Client.ConsumerDispatching;
+using RabbitMQ.Client.Diagnostics;
 using RabbitMQ.Client.Events;
 using RabbitMQ.Client.Exceptions;
 using RabbitMQ.Client.Framing.Impl;
@@ -46,6 +49,8 @@ namespace RabbitMQ.Client.Impl
 {
     internal abstract class ModelBase : IModel, IRecoverable
     {
+        private static readonly DiagnosticSource ds = new DiagnosticListener(DiagnosticConstants.DIAGNOSTIC_SOURCE_NAME);   //1.0.1
+
         ///<summary>Only used to kick-start a connection open
         ///sequence. See <see cref="Connection.Open"/> </summary>
         internal BlockingCell<ConnectionStartDetails> m_connectionStartCell;
@@ -864,6 +869,18 @@ namespace RabbitMQ.Client.Impl
 
         public void BasicPublish(string exchange, string routingKey, bool mandatory, IBasicProperties basicProperties, ReadOnlyMemory<byte> body)
         {
+            //1.0.1
+            var sw = new Stopwatch();
+            sw.Start();
+            var payload = new DiagnosticAPMPayload()
+            {
+                Action = $"{typeof(ModelBase).FullName}.BasicPublish()",
+                ActionType = DiagnosticAPMConstants.BASIC_PUBLISH_START.ToString(),
+                CorrelationId = Guid.NewGuid()
+            };
+            ds.Write($"{typeof(ModelBase).FullName}.BasicPublish().Start", payload);
+            //1.0.1
+
             if (routingKey is null)
             {
                 throw new ArgumentNullException(nameof(routingKey));
@@ -882,6 +899,13 @@ namespace RabbitMQ.Client.Impl
                 mandatory,
                 basicProperties ?? _emptyBasicProperties,
                 body);
+
+            //1.0.1
+            sw.Stop();
+            payload.ActionType = DiagnosticAPMConstants.BASIC_PUBLISH_END.ToString();
+            payload.TimeElapsed = sw.ElapsedMilliseconds;
+            ds.Write($"{typeof(ModelBase).FullName}.BasicPublish().End", payload);
+            //1.0.1
         }
 
         public void BasicPublish(CachedString exchange, CachedString routingKey, bool mandatory, IBasicProperties basicProperties, ReadOnlyMemory<byte> body)

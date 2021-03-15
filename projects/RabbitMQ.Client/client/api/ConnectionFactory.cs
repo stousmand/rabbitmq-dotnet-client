@@ -29,12 +29,14 @@
 //  Copyright (c) 2007-2020 VMware, Inc.  All rights reserved.
 //---------------------------------------------------------------------------
 
+//1.0.1				20210308				shirhan.apache@gmail.com						Adding DiagnosticSource to .Net Client
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Net.Security;
 using System.Security.Authentication;
-
+using RabbitMQ.Client.Diagnostics;
 using RabbitMQ.Client.Exceptions;
 using RabbitMQ.Client.Framing.Impl;
 using RabbitMQ.Client.Impl;
@@ -87,6 +89,8 @@ namespace RabbitMQ.Client
     ///hosts with an empty name are not addressable. </para></remarks>
     public sealed class ConnectionFactory : ConnectionFactoryBase, IConnectionFactory
     {
+        private static readonly DiagnosticSource ds = new DiagnosticListener(DiagnosticConstants.DIAGNOSTIC_SOURCE_NAME);	//1.0.1
+
         /// <summary>
         /// Default value for the desired maximum channel number. Default: 2047.
         /// </summary>
@@ -484,6 +488,18 @@ namespace RabbitMQ.Client
         /// </exception>
         public IConnection CreateConnection(IEndpointResolver endpointResolver, string clientProvidedName)
         {
+            //1.0.1
+            var sw = new Stopwatch();
+            sw.Start();
+            var payload = new DiagnosticAPMPayload()
+            {
+                Action = $"{typeof(ConnectionFactory).FullName}.CreateConnection()",
+                ActionType = DiagnosticAPMConstants.CREATE_CONNECTION_START.ToString(),
+                CorrelationId = Guid.NewGuid()
+            };
+            ds.Write($"{typeof(ConnectionFactory).FullName}.CreateConnection().Start", payload);
+            //1.0.1
+
             IConnection conn;
             try
             {
@@ -500,7 +516,17 @@ namespace RabbitMQ.Client
             }
             catch (Exception e)
             {
+                payload.Details = e.Message;
+                payload.ActionType = DiagnosticAPMConstants.EXCEPTION.ToString();
+                ds.Write($"{typeof(ConnectionFactory).FullName}.CreateConnection().Exception", payload);	//1.0.1
                 throw new BrokerUnreachableException(e);
+            }
+            finally
+            {
+                sw.Stop();
+                payload.TimeElapsed = sw.ElapsedMilliseconds;
+                payload.ActionType = DiagnosticAPMConstants.CREATE_CONNECTION_END.ToString();
+                ds.Write($"{typeof(ConnectionFactory).FullName}.CreateConnection().End", payload);          //1.0.1
             }
 
             return conn;
