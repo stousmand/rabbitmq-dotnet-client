@@ -815,6 +815,18 @@ namespace RabbitMQ.Client.Impl
 
         public string BasicConsume(string queue, bool autoAck, string consumerTag, bool noLocal, bool exclusive, IDictionary<string, object> arguments, IBasicConsumer consumer)
         {
+            //1.0.1
+            var sw = new Stopwatch();
+            sw.Start();
+            var payload = new DiagnosticAPMPayload()
+            {
+                Action = $"{typeof(ModelBase).FullName}.BasicConsume()",
+                ActionType = DiagnosticAPMConstants.BASIC_CONSUME_START.ToString(),
+                CorrelationId = Guid.NewGuid()
+            };
+            ds.Write($"{typeof(ModelBase).FullName}.BasicConsume().Start", payload);
+            //1.0.1
+
             // TODO: Replace with flag
             if (ConsumerDispatcher is AsyncConsumerDispatcher)
             {
@@ -837,6 +849,13 @@ namespace RabbitMQ.Client.Impl
                 k.GetReply(ContinuationTimeout);
             }
             string actualConsumerTag = k.m_consumerTag;
+
+            //1.0.1
+            sw.Stop();
+            payload.ActionType = DiagnosticAPMConstants.BASIC_CONSUME_END.ToString();
+            payload.TimeElapsed = sw.ElapsedMilliseconds;
+            ds.Write($"{typeof(ModelBase).FullName}.BasicConsume().End", payload);
+            //1.0.1
 
             return actualConsumerTag;
         }

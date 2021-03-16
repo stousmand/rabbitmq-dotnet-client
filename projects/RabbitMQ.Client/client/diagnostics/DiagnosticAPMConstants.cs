@@ -15,7 +15,9 @@ namespace RabbitMQ.Client.Diagnostics
         CREATE_CONNECTION_START = 11,
         CREATE_CONNECTION_END = 12,
         BASIC_PUBLISH_START = 13,
-        BASIC_PUBLISH_END = 14
+        BASIC_PUBLISH_END = 14,
+        BASIC_CONSUME_START = 15,
+        BASIC_CONSUME_END = 16
     }
 
     public static class DiagnosticConstants
